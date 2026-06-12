@@ -1,11 +1,14 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.png">
-    <img src="docs/assets/logo-light.png" alt="buffer" width="200">
-  </picture>
-</p>
-
-# Buffer
+<table border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td width="220" valign="middle">
+<picture>
+<source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.png">
+<img src="docs/assets/logo-light.png" alt="buffer" width="200">
+</picture>
+</td>
+<td valign="middle"><h1>B&nbsp;U&nbsp;F&nbsp;F&nbsp;E&nbsp;R</h1></td>
+</tr>
+</table>
 
 A screen recorder utility that runs continuously in the background (like a dashcam). When a bug happens, hit a hotkey to save the last 30 seconds of screen recording.
 

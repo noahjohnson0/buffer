@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/logo.png" alt="buffer" width="200">
+</p>
+
 # Buffer
 
 A screen recorder utility that runs continuously in the background (like a dashcam). When a bug happens, hit a hotkey to save the last 30 seconds of screen recording.

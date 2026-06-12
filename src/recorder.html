@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Recorder</title>
+</head>
+<body>
+  <script>
+    const { ipcRenderer } = require('electron');
+    const fixWebmDuration = require('fix-webm-duration');
+
+    let mediaRecorder = null;
+    let stream = null;
+    let screenSourceId = null;
+    let recordedChunks = [];
+    let isSaving = false;
+    let recordingStartTime = null;
+
+    async function startRecording(sourceId) {
+      try {
+        if (!sourceId) {
+          throw new Error('No screen source ID provided');
+        }
+
+        // Request screen capture
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            mandatory: {
+              chromeMediaSource: 'desktop',
+              chromeMediaSourceId: sourceId,
+              minWidth: 1280,
+              maxWidth: 1920,
+              minHeight: 720,
+              maxHeight: 1080
+            }
+          }
+        });
+
+        // Use MediaRecorder API
+        const options = {
+          mimeType: 'video/webm;codecs=vp9',
+          videoBitsPerSecond: 2500000
+        };
+
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+          // Fallback to VP8
+          options.mimeType = 'video/webm;codecs=vp8';
+          if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            // Fallback to default
+            options.mimeType = 'video/webm';
+          }
+        }
+
+        mediaRecorder = new MediaRecorder(stream, options);
+        recordedChunks = [];
+        recordingStartTime = Date.now();
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            recordedChunks.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = async () => {
+          // When recording stops, create a complete blob
+          if (recordedChunks.length > 0) {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const duration = recordingStartTime ? Date.now() - recordingStartTime : 0;
+            
+            if (isSaving && duration > 0) {
+              // This is a save operation - fix duration and send to main process
+              try {
+                const fixedBlob = await fixWebmDuration(blob, duration);
+                const reader = new FileReader();
+                reader.onload = () => {
+                  ipcRenderer.send('saved-recording', {
+                    buffer: Array.from(new Uint8Array(reader.result))
+                  });
+                  isSaving = false;
+                  recordedChunks = [];
+                  
+                  // Restart recording
+                  if (stream && stream.active) {
+                    setTimeout(() => {
+                      startRecording(screenSourceId);
+                    }, 100);
+                  }
+                };
+                reader.readAsArrayBuffer(fixedBlob);
+              } catch (error) {
+                console.error('Error fixing WebM duration:', error);
+                // Fallback to unfixed blob
+                const reader = new FileReader();
+                reader.onload = () => {
+                  ipcRenderer.send('saved-recording', {
+                    buffer: Array.from(new Uint8Array(reader.result))
+                  });
+                  isSaving = false;
+                  recordedChunks = [];
+                  
+                  if (stream && stream.active) {
+                    setTimeout(() => {
+                      startRecording(screenSourceId);
+                    }, 100);
+                  }
+                };
+                reader.readAsArrayBuffer(blob);
+              }
+            } else {
+              // This is a normal segment - send to buffer
+              const reader = new FileReader();
+              reader.onload = () => {
+                ipcRenderer.send('recording-blob', {
+                  buffer: Array.from(new Uint8Array(reader.result)),
+                  duration: duration / 1000 // convert to seconds
+                });
+                recordedChunks = [];
+                
+                // Restart recording if stream is still active
+                if (stream && stream.active && !isSaving) {
+                  setTimeout(() => {
+                    startRecording(screenSourceId);
+                  }, 100);
+                }
+              };
+              reader.readAsArrayBuffer(blob);
+            }
+          } else {
+            // No data, just restart if not saving
+            if (stream && stream.active && !isSaving) {
+              setTimeout(() => {
+                startRecording(screenSourceId);
+              }, 100);
+            }
+            isSaving = false;
+          }
+        };
+
+        mediaRecorder.onerror = (event) => {
+          console.error('MediaRecorder error:', event);
+          ipcRenderer.send('recording-error', event.error?.message || 'Unknown error');
+          isSaving = false;
+        };
+
+        mediaRecorder.onstart = () => {
+          recordingStartTime = Date.now();
+          ipcRenderer.send('recording-started');
+        };
+
+        // Start recording - will record continuously until stopped
+        mediaRecorder.start();
+        console.log('Recording started in hidden window');
+      } catch (error) {
+        console.error('Error starting recording:', error);
+        ipcRenderer.send('recording-error', error.message);
+        isSaving = false;
+      }
+    }
+
+    // Listen for screen source from main process
+    ipcRenderer.on('screen-source', (event, sourceId) => {
+      screenSourceId = sourceId;
+      startRecording(sourceId);
+    });
+
+    // Listen for save request
+    ipcRenderer.on('save-recording', () => {
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        isSaving = true;
+        // Request any pending data
+        mediaRecorder.requestData();
+        // Stop the recording - onstop will handle saving and restart
+        setTimeout(() => {
+          mediaRecorder.stop();
+        }, 200);
+      }
+    });
+
+    // Cleanup on unload
+    window.addEventListener('beforeunload', () => {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    });
+  </script>
+</body>
+</html>

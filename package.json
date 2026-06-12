@@ -1,0 +1,39 @@
+{
+  "name": "buffer",
+  "version": "1.0.0",
+  "description": "Screen recorder that runs in a buffer like a dashcam",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "keywords": [
+    "screen-recorder",
+    "electron",
+    "menubar"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "electron-store": "^8.1.0",
+    "fix-webm-duration": "^1.0.6",
+    "menubar": "^9.5.2"
+  },
+  "build": {
+    "appId": "com.buffer.app",
+    "productName": "Buffer",
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*"
+    ]
+  }
+}

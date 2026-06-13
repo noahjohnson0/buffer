@@ -68,3 +68,7 @@ On macOS, you'll need to grant:
 - The app doesn't appear in the dock (menubar only)
 
 
+
+## Screenshot
+
+![Buffer settings window](docs/assets/screenshot.png)
